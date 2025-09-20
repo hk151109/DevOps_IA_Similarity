@@ -87,7 +87,6 @@ Environment variables
 ```bash
 set AI_SCORE_API_URL=http://localhost:5001
 python app.py
-# Service listens on Flask default (e.g., 5000 via flask run or use app.run in a wrapper)
 ```
 
 Tip: Start the AI service first on port 5001 (see `../AI_content`). Set `AI_SCORE_API_URL` accordingly.
