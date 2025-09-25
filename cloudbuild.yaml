@@ -1,0 +1,77 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA']
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['container', 'clusters', 'get-credentials', '${_GKE_CLUSTER}', '--zone', '${_GKE_ZONE}', '--project', '$PROJECT_ID']
+  - name: 'gcr.io/cloud-builders/kubectl'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    args: ['apply', '-f', 'k8s.yaml']
+  - name: 'gcr.io/cloud-builders/kubectl'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/similarity'
+  - 'similarity=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA'
+  # If external AI URL is provided, set it on the deployment
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'Set AI URL env (optional)'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [ -n "${_AI_URL}" ]; then kubectl set env deployment/similarity AI_SCORE_API_URL=${_AI_URL}; else echo 'No _AI_URL provided'; fi
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'Wait for LB IP'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        for i in {1..60}; do
+          ip=$(kubectl get svc similarity-svc -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || true)
+          if [ -n "$ip" ]; then echo "$ip" > /workspace/SIMILARITY_IP && echo "LB IP: $ip" && exit 0; fi
+          sleep 5
+        done
+        echo "Timed out waiting for LB IP" && exit 1
+  - name: 'curlimages/curl'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        ip=$(cat /workspace/SIMILARITY_IP)
+        curl -sf http://$ip/health
+  # Chain check: ensure Similarity can reach AI service if external IP exists
+  - name: 'gcr.io/cloud-builders/kubectl'
+    id: 'Chain check AI service from inside cluster'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=${_GKE_ZONE}'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        kubectl delete pod chain-check --ignore-not-found
+        kubectl run chain-check --image=curlimages/curl --restart=Never --command -- sh -c "curl -sf http://ai-content-svc/health"
+        kubectl wait --for=condition=Ready pod/chain-check --timeout=60s || true
+        kubectl logs chain-check || true
+        # Clean up
+        kubectl delete pod chain-check --wait=true
+images:
+  - 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA'
+substitutions:
+  _GKE_CLUSTER: devops-ia-cluster
+  _GKE_ZONE: asia-south1-a
+  _AI_URL: ''
+timeout: 1200s
