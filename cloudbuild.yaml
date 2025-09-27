@@ -1,8 +1,8 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA', '.']
+    args: ['build', '-t', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$BUILD_ID', '.']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA']
+    args: ['push', 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$BUILD_ID']
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['container', 'clusters', 'get-credentials', '${_GKE_CLUSTER}', '--zone', '${_GKE_ZONE}', '--project', '$PROJECT_ID']
   - name: 'gcr.io/cloud-builders/kubectl'
@@ -18,7 +18,7 @@ steps:
       - 'set'
       - 'image'
       - 'deployment/similarity'
-  - 'similarity=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA'
+      - 'similarity=asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$BUILD_ID'
   # If external AI URL is provided, set it on the deployment
   - name: 'gcr.io/cloud-builders/kubectl'
     id: 'Set AI URL env (optional)'
@@ -69,7 +69,7 @@ steps:
         # Clean up
         kubectl delete pod chain-check --wait=true
 images:
-  - 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$COMMIT_SHA'
+  - 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$BUILD_ID'
 substitutions:
   _GKE_CLUSTER: devops-ia-cluster
   _GKE_ZONE: asia-south1-a
