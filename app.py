@@ -74,7 +74,7 @@ user_scores_log = {}
 import platform
 if platform.system() == "Windows":
     pytesseract.pytesseract.tesseract_cmd = r"C:\\Program Files\\Tesseract-OCR\\tesseract.exe"
-
+# test comment
 class PDFProcessor:
     """Enhanced PDF processing with OCR capabilities"""
     

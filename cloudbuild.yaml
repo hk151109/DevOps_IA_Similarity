@@ -68,10 +68,17 @@ steps:
         kubectl logs chain-check || true
         # Clean up
         kubectl delete pod chain-check --wait=true
+
 images:
   - 'asia-south1-docker.pkg.dev/$PROJECT_ID/containers/similarity:$BUILD_ID'
+
 substitutions:
   _GKE_CLUSTER: devops-ia-cluster
   _GKE_ZONE: asia-south1-a
   _AI_URL: ''
+
+# <-- REQUIRED OPTIONS BLOCK
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 timeout: 1200s
